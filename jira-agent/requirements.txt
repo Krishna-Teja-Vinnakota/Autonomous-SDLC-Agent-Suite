@@ -1,0 +1,17 @@
+# Core Streamlit UI
+streamlit>=1.28.0
+
+# LangChain and LangGraph for AI workflow orchestration
+langchain-core>=0.1.0
+langgraph>=0.0.1
+langchain-google-vertexai>=0.1.0
+
+# Google Cloud integration
+google-auth>=2.25.0
+google-cloud-core>=2.4.0
+
+# JIRA integration (optional but recommended for ticket creation)
+jira>=3.13.0
+
+# Python standard library (included with Python, listed for reference)
+# json, uuid, operator, sqlite3, typing, datetime, os, threading, time
