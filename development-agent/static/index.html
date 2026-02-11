@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Agent V2.0</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1>🤖 Developer Agent V2.0</h1>
+                <p class="subtitle">AI-Powered Jira Ticket Resolution with Validation</p>
+            </div>
+            <button id="configTestBtn" class="btn btn-secondary">Test Config</button>
+        </header>
+
+        <main class="main-content">
+            <!-- Start Workflow Section -->
+            <section class="card" id="startSection">
+                <h2>Start New Workflow</h2>
+                <form id="startWorkflowForm">
+                    <div class="form-group">
+                        <label for="jiraTicketId">🎫 Jira Ticket ID</label>
+                        <input type="text" id="jiraTicketId" placeholder="e.g., PROJ-123" required class="input-field">
+                    </div>
+                    <div class="form-group">
+                        <label for="repoPath">📁 Repository Path</label>
+                        <input type="text" id="repoPath" placeholder="e.g., /path/to/repo" required class="input-field">
+                    </div>
+                    <button type="submit" class="btn btn-primary">▶ Start Workflow</button>
+                </form>
+            </section>
+
+            <!-- Status Section -->
+            <section class="card" id="statusSection" style="display: none;">
+                <div class="status-header">
+                    <h2>Workflow Status</h2>
+                    <span id="workflowId" class="workflow-id"></span>
+                </div>
+
+                <!-- Stage Progress Indicator -->
+                <div class="stage-indicator">
+                    <div class="stage" data-stage="initialized">
+                        <div class="stage-icon">1</div>
+                        <div class="stage-label">Init</div>
+                    </div>
+                    <div class="stage" data-stage="jira_fetched">
+                        <div class="stage-icon">2</div>
+                        <div class="stage-label">Jira</div>
+                    </div>
+                    <div class="stage" data-stage="session_ready">
+                        <div class="stage-icon">3</div>
+                        <div class="stage-label">Index</div>
+                    </div>
+                    <div class="stage" data-stage="files_identified">
+                        <div class="stage-icon">4</div>
+                        <div class="stage-label">Analyze</div>
+                    </div>
+                    <div class="stage" data-stage="awaiting_file_approval">
+                        <div class="stage-icon">5</div>
+                        <div class="stage-label">Approve Files</div>
+                    </div>
+                    <div class="stage" data-stage="code_modified">
+                        <div class="stage-icon">6</div>
+                        <div class="stage-label">Modify</div>
+                    </div>
+                    <div class="stage" data-stage="validated">
+                        <div class="stage-icon">7</div>
+                        <div class="stage-label">Validate</div>
+                    </div>
+                    <div class="stage" data-stage="awaiting_validation_approval">
+                        <div class="stage-icon">8</div>
+                        <div class="stage-label">Approve</div>
+                    </div>
+                    <div class="stage" data-stage="completed">
+                        <div class="stage-icon">✓</div>
+                        <div class="stage-label">Done</div>
+                    </div>
+                </div>
+
+                <!-- Phase 1: JIRA Details -->
+                <div id="jiraDetails" class="info-section jira-section" style="display: none;">
+                    <h3>📋 Jira Ticket Details</h3>
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">ID:</span>
+                            <span id="ticketKey"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Type:</span>
+                            <span id="ticketType"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Priority:</span>
+                            <span id="ticketPriority"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Status:</span>
+                            <span id="ticketStatus"></span>
+                        </div>
+                        <div class="detail-item full-width">
+                            <span class="detail-label">Summary:</span>
+                            <span id="ticketSummary"></span>
+                        </div>
+                        <div class="detail-item full-width">
+                            <span class="detail-label">Description:</span>
+                            <span id="ticketDescription"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phase 2: Indexing Updates -->
+                <div id="indexingSection" class="info-section indexing-section" style="display: none;">
+                    <div class="indexing-content">
+                        <div class="indexing-icon">🔄</div>
+                        <h3>Checking Code Changes</h3>
+                        <p>Updating embeddings for modified files...</p>
+                        <div class="indexing-loader"></div>
+                    </div>
+                </div>
+
+                <!-- Phase 3: Searching State -->
+                <div id="searchingSection" class="info-section searching-section" style="display: none;">
+                    <div class="searching-content">
+                        <div class="searching-icon">🔍</div>
+                        <h3>Performing Semantic Search</h3>
+                        <p>Searching through the codebase to find relevant files...</p>
+                        <div class="searching-loader"></div>
+                    </div>
+                </div>
+
+                <!-- Phase 4: Search Results -->
+                <div id="searchResultsSection" class="info-section search-results-section" style="display: none;">
+                    <h3>🔍 Top Relevant Files Found</h3>
+                    <p class="section-description">These are the most relevant files based on semantic search:</p>
+                    <div id="searchResultsList" class="search-results-list"></div>
+                    <div class="next-step-indicator">
+                        <div class="loader-small"></div>
+                        <span>Identifying files that need modification...</span>
+                    </div>
+                </div>
+
+                <!-- Phase 5: Files to Modify -->
+                <div id="fileAnalysisSection" class="info-section files-section" style="display: none;">
+                    <h3>📝 Files Selected for Modification</h3>
+                    <div id="analysisContent" class="analysis-content"></div>
+                    <div class="files-list">
+                        <h4>Files to Modify:</h4>
+                        <ul id="filesList"></ul>
+                    </div>
+                    <div class="approval-actions">
+                        <button id="approveFilesBtn" class="btn btn-approve">
+                            <span class="btn-icon">✓</span>
+                            <span>Approve Files</span>
+                        </button>
+                        <button id="rejectFilesBtn" class="btn btn-reject">
+                            <span class="btn-icon">✗</span>
+                            <span>Reject</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Phase 6: Direct Modification -->
+                <div id="modificationSection" class="info-section modification-section" style="display: none;">
+                    <h3>🔧 Direct Code Modification</h3>
+                    <p class="section-description">Modifying files directly based on JIRA requirements...</p>
+                    <div id="modificationProgress" class="modification-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="modificationProgressBar"></div>
+                        </div>
+                        <p id="modificationStatus">Starting modification...</p>
+                    </div>
+                    <div id="modificationContent" class="modification-content" style="display: none;">
+                        <h4>Modified Files:</h4>
+                        <div id="modifiedFilesList"></div>
+                    </div>
+                </div>
+
+                <!-- Phase 7: Validation Completed -->
+                <div id="validationSection" class="info-section validation-section" style="display: none;">
+                    <h3>✅ Validation & Auto-fix Completed</h3>
+                    <p class="section-description">Code validation and automatic fixes have been applied successfully.</p>
+
+                    <div id="validationFilesList" class="validation-files-list">
+                        <!-- Will be populated with validated files -->
+                    </div>
+                    
+                    <div class="validation-approval-actions">
+                        <button id="approveValidationBtn" class="btn btn-approve btn-large">
+                            <span class="btn-icon">✅</span>
+                            <span>Approve & Create PR</span>
+                        </button>
+                        <button id="feedbackValidationBtn" class="btn btn-modify">
+                            <span class="btn-icon">💬</span>
+                            <span>Provide Feedback</span>
+                        </button>
+                        <!-- REMOVE the reject button entirely -->
+                    </div>
+
+                    <!-- Feedback Form -->
+                    <div id="validationFeedbackForm" class="feedback-form" style="display: none;">
+                        <h4>💬 Provide Feedback</h4>
+                        <p>Describe what needs to be changed or fixed:</p>
+                        <textarea id="validationFeedback" placeholder="e.g., The schema change is correct but the API endpoint needs to handle validation errors..." rows="5"></textarea>
+                        <div class="feedback-actions">
+                            <button id="submitValidationFeedbackBtn" class="btn btn-primary">
+                                <span class="btn-icon">✓</span>
+                                <span>Submit Feedback</span>
+                            </button>
+                            <button id="cancelValidationFeedbackBtn" class="btn btn-secondary">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phase 8: Processing Feedback -->
+                <div id="feedbackProcessingSection" class="info-section feedback-processing-section" style="display: none;">
+                    <h3>💬 Processing Human Feedback</h3>
+                    <p class="section-description">Applying your feedback and re-validating changes...</p>
+                    <div class="feedback-content">
+                        <div class="feedback-display">
+                            <h4>Your Feedback:</h4>
+                            <div id="feedbackDisplay" class="feedback-text"></div>
+                        </div>
+                        <div class="processing-loader">
+                            <div class="loader-small"></div>
+                            <span>Updating code based on feedback...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phase 9: PR Created -->
+                <div id="prSection" class="info-section success-section" style="display: none;">
+                    <div class="success-icon">🎉</div>
+                    <h3>Pull Request Created Successfully!</h3>
+                    <p class="success-message">Your pull request has been created and is ready for review</p>
+                    <div class="pr-actions">
+                        <a id="prLink" href="#" target="_blank" class="btn btn-primary btn-large">
+                            <span class="btn-icon">🔗</span>
+                            <span>View Pull Request</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Error Section -->
+                <div id="errorSection" class="info-section error-section" style="display: none;">
+                    <div class="error-icon">⚠️</div>
+                    <h3>An Error Occurred</h3>
+                    <p id="errorMessage" class="error-message"></p>
+                </div>
+
+                <!-- Activity Log -->
+                <div class="info-section activity-section">
+                    <h3>📊 Activity Log</h3>
+                    <div id="activityLog" class="activity-log"></div>
+                </div>
+
+                <button id="resetBtn" class="btn btn-secondary" style="margin-top: 20px;">
+                    <span class="btn-icon">🔄</span>
+                    <span>New Workflow</span>
+                </button>
+            </section>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loader"></div>
+        <p id="loadingMessage">Processing...</p>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
