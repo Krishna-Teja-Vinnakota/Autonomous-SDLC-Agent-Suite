@@ -1,0 +1,187 @@
+name: E2E Feature Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch: # Allow manual trigger
+
+# Cancel in-progress runs for same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-tests:
+    name: E2E Tests (Shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    strategy:
+      fail-fast: false # Continue running other shards even if one fails
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
+    
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+      
+      # 4. Install Playwright browsers (chromium only for speed)
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+      
+      # 5. Build application
+      - name: Build Next.js application
+        run: npm run build
+        env:
+          NODE_ENV: production
+          # Add any build-time env vars here
+          # NEXT_PUBLIC_API_URL: https://api.example.com
+      
+      # 6. Start application server in background
+      - name: Start application server
+        run: |
+          npm run start &
+          echo "Waiting for app to be ready at http://localhost:3000..."
+          npx wait-on http://localhost:3000 --timeout 60000
+          echo "✅ App is ready!"
+        env:
+          PORT: 3000
+          NODE_ENV: production
+      
+      # 7. Run Playwright tests (sharded for parallel execution)
+      - name: Run Playwright E2E tests
+        run: npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+        env:
+          CI: true
+          BASE_URL: http://localhost:3000
+          # Add any runtime env vars here
+          # API_MOCK_ENABLED: true
+      
+      # 8. Upload test results on failure
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.shardIndex }}
+          path: playwright-report/
+          retention-days: 7
+      
+      # 9. Upload trace files for debugging
+      - name: Upload Playwright Traces
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces-${{ matrix.shardIndex }}
+          path: test-results/**/trace.zip
+          retention-days: 7
+      
+      # 10. Upload screenshots on failure
+      - name: Upload Screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: screenshots-${{ matrix.shardIndex }}
+          path: test-results/**/*.png
+          retention-days: 7
+      
+      # 11. Upload videos on failure
+      - name: Upload Videos
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: videos-${{ matrix.shardIndex }}
+          path: test-results/**/*.webm
+          retention-days: 7
+
+  # Merge reports from all shards into single HTML report
+  merge-reports:
+    name: Merge Test Reports
+    if: always() # Run even if some shards failed
+    needs: [e2e-tests]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install Playwright
+        run: npm install -D @playwright/test
+      
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports
+          pattern: playwright-report-*
+          merge-multiple: true
+      
+      - name: Merge Playwright reports
+        run: npx playwright merge-reports --reporter html ./all-reports
+      
+      - name: Upload merged HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-merged
+          path: playwright-report/
+          retention-days: 30
+      
+      - name: Comment PR with test results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const reportPath = 'playwright-report/index.html';
+            
+            if (fs.existsSync(reportPath)) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🎭 Playwright E2E Test Results
+                
+                Test report is available in the workflow artifacts.
+                
+                Download the \`playwright-report-merged\` artifact to view the full HTML report.
+                
+                [View workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId})`
+              });
+            }
+
+  # Optional: Run visual regression tests (if you add Playwright screenshots)
+  # visual-regression:
+  #   name: Visual Regression Tests
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: '20'
+  #     - run: npm ci
+  #     - run: npx playwright install --with-deps
+  #     - run: npx playwright test --grep @visual
+  #     - uses: actions/upload-artifact@v4
+  #       if: failure()
+  #       with:
+  #         name: visual-regression-diffs
+  #         path: test-results/**/*-diff.png
