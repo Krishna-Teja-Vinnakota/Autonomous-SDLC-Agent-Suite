@@ -1,0 +1,28 @@
+# Core Framework
+streamlit>=1.31.0
+python-dotenv>=1.0.0
+
+# Git Operations
+GitPython>=3.1.41
+
+# Google Cloud & Vertex AI
+google-cloud-aiplatform>=1.42.0
+
+# LangGraph / LangChain
+langgraph>=0.0.26
+langchain>=0.1.5
+langchain-google-vertexai>=0.1.0
+
+# Testing Frameworks
+pytest>=7.4.4
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+pytest-asyncio>=0.21.1
+pytest-timeout>=2.2.0
+pytest-xdist>=3.5.0
+
+# Visualization
+plotly>=5.18.0
+
+# Utilities
+typing-extensions>=4.9.0

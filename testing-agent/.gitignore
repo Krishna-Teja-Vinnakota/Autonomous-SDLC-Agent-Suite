@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+venv/
+node_modules/
+playwright-report/
+test-results/
+coverage/
+temp/
+workspaces/
+reports/
+.venv/
+*.log
+*.sqlite
+*.db
+.DS_Store
+# Credentials
+*credential*.json
+*client*.json
+service-account-key.json
